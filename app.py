@@ -7,7 +7,7 @@ from main_pipeline import run_pipeline
 st.set_page_config(layout="wide")
 
 # =====================================================
-# Custom Styling
+# CUSTOM CSS
 # =====================================================
 st.markdown("""
 <style>
@@ -40,13 +40,13 @@ header {visibility: hidden;}
 """, unsafe_allow_html=True)
 
 # =====================================================
-# Page State
+# SESSION STATE
 # =====================================================
 if "page" not in st.session_state:
     st.session_state.page = "Home"
 
 # =====================================================
-# Top Navbar
+# TOP NAVBAR
 # =====================================================
 st.markdown("""
 <div class="navbar">
@@ -54,8 +54,7 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# Right side navigation
-left_space, nav1, nav2, nav3 = st.columns([6,1,1,1])
+space, nav1, nav2, nav3 = st.columns([6,1,1,1])
 
 with nav1:
     if st.button("Dashboard"):
@@ -112,7 +111,7 @@ if st.session_state.page == "Home":
             st.rerun()
 
 # =====================================================
-# DASHBOARD PAGE
+# DASHBOARD
 # =====================================================
 elif st.session_state.page == "Dashboard":
 
@@ -122,8 +121,8 @@ elif st.session_state.page == "Dashboard":
 
     metrics = st.session_state.metrics
     model = st.session_state.model
-    y_test = st.session_state.y_test
-    feature_names = st.session_state.selected_features
+    y_test = np.array(st.session_state.y_test)
+    selected_features = st.session_state.selected_features
 
     st.markdown("<div class='card'>", unsafe_allow_html=True)
     st.subheader("📊 Model Performance Dashboard")
@@ -140,58 +139,53 @@ elif st.session_state.page == "Dashboard":
     colA, colB = st.columns(2)
 
     # -----------------------------
-    # Feature Importance
+    # FEATURE IMPORTANCE
     # -----------------------------
     with colA:
         st.markdown("<div class='card'>", unsafe_allow_html=True)
         st.subheader("Top Feature Importance")
 
         importances = model.feature_importances_
-        indices = np.argsort(importances)[-10:]
+        top_indices = np.argsort(importances)[-10:]
 
         fig, ax = plt.subplots()
-        ax.barh(range(len(indices)), importances[indices])
-        ax.set_yticks(range(len(indices)))
-        ax.set_yticklabels([feature_names[i] for i in indices])
+        ax.barh(range(len(top_indices)), importances[top_indices])
+        ax.set_yticks(range(len(top_indices)))
+        ax.set_yticklabels([selected_features[i] for i in top_indices])
         ax.set_title("Top 10 Important Features")
         st.pyplot(fig)
 
         st.markdown("</div>", unsafe_allow_html=True)
 
     # -----------------------------
-    # Malware vs Benign Pie
+    # PIE CHART (SAFE VERSION)
     # -----------------------------
     with colB:
         st.markdown("<div class='card'>", unsafe_allow_html=True)
         st.subheader("Application Classification Distribution")
 
-        safe = int((y_test == 0).sum())
-        malware = int((y_test == 1).sum())
-        total = safe + malware
+        unique_classes, counts = np.unique(y_test, return_counts=True)
 
         fig2, ax2 = plt.subplots()
 
-        if total == 0:
-            ax2.text(0.5, 0.5, "No Class Distribution Available",
+        if len(unique_classes) == 0 or np.sum(counts) == 0:
+            ax2.text(0.5, 0.5, "No Data Available",
                      horizontalalignment='center',
                      verticalalignment='center',
                      fontsize=12)
             ax2.axis("off")
         else:
-            ax2.pie(
-                [safe, malware],
-                labels=["Benign", "Malware"],
-                autopct="%1.1f%%",
-                startangle=90
-            )
+            labels = [f"Class {cls}" for cls in unique_classes]
+            ax2.pie(counts, labels=labels,
+                    autopct="%1.1f%%",
+                    startangle=90)
             ax2.axis("equal")
 
         st.pyplot(fig2)
-
         st.markdown("</div>", unsafe_allow_html=True)
 
 # =====================================================
-# FEATURE SELECTION PAGE
+# FEATURE SELECTION
 # =====================================================
 elif st.session_state.page == "Feature":
 
@@ -202,15 +196,13 @@ elif st.session_state.page == "Feature":
     st.markdown("<div class='card'>", unsafe_allow_html=True)
     st.subheader("🧬 Genetic Algorithm Feature Selection")
 
-    st.write("### Selected Features After GA Optimization")
-
     for f in st.session_state.selected_features:
         st.write(f"• {f}")
 
     st.markdown("</div>", unsafe_allow_html=True)
 
 # =====================================================
-# EXPLAINABLE AI PAGE
+# EXPLAINABLE AI
 # =====================================================
 elif st.session_state.page == "Explain":
 
@@ -221,11 +213,11 @@ elif st.session_state.page == "Explain":
     st.markdown("<div class='card'>", unsafe_allow_html=True)
     st.subheader("🔍 Explainable AI (SHAP Summary)")
 
-    try:
-        model = st.session_state.model
-        X_test = st.session_state.X_test
-        feature_names = st.session_state.selected_features
+    model = st.session_state.model
+    X_test = st.session_state.X_test
+    selected_features = st.session_state.selected_features
 
+    try:
         explainer = shap.TreeExplainer(model)
         shap_values = explainer.shap_values(X_test)
 
@@ -233,12 +225,13 @@ elif st.session_state.page == "Explain":
         shap.summary_plot(
             shap_values,
             X_test,
-            feature_names=feature_names,
+            feature_names=selected_features,
             show=False
         )
         st.pyplot(fig)
 
     except Exception as e:
-        st.error("SHAP visualization could not be generated.")
+        st.warning("SHAP visualization failed.")
+        st.write(str(e))
 
     st.markdown("</div>", unsafe_allow_html=True)
