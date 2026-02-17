@@ -3,15 +3,13 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import f1_score
 
 
-def genetic_feature_selection(X, y, population_size=6, generations=4):
+def genetic_feature_selection(X, y, generations=5, population_size=6):
 
-    X = np.array(X)
-    y = np.array(y)
+    num_features = X.shape[1]
 
-    n_features = X.shape[1]
+    population = np.random.randint(2, size=(population_size, num_features))
 
-    population = np.random.randint(0, 2, (population_size, n_features))
-    selection_frequency = np.zeros(n_features)
+    selection_frequency = np.zeros(num_features)
 
     for _ in range(generations):
 
@@ -25,17 +23,24 @@ def genetic_feature_selection(X, y, population_size=6, generations=4):
 
             selected = X[:, individual == 1]
 
-            model = RandomForestClassifier(n_estimators=20)
+            model = RandomForestClassifier(n_estimators=30)
             model.fit(selected, y)
 
             preds = model.predict(selected)
-            scores.append(f1_score(y, preds, average="weighted"))
+
+            score = f1_score(y, preds, average="weighted")
+            scores.append(score)
 
         best_indices = np.argsort(scores)[-2:]
         population = population[best_indices]
 
-        selection_frequency += population.sum(axis=0)
+        for ind in population:
+            selection_frequency += ind
 
-    best_mask = population[0]
+        # Crossover
+        child = (population[0] + population[1]) > 0
+        population = np.vstack([population, child.astype(int)])
+
+    best_mask = population[np.argmax(scores)]
 
     return best_mask, selection_frequency
